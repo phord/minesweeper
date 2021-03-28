@@ -2,8 +2,6 @@
 
 from random import randrange, seed
 
-seed()
-
 class Cell:
     def __init__(self):
         self.hidden = True
@@ -21,13 +19,16 @@ class Cell:
         self.marked = not self.marked
         return self.marked
 
+    def getValue(self):
+        return None if self.hidden else self.value
+
     def __str__(self):
         if self.marked:
             return '🚩'
         elif self.hidden:
             return '🔲'
         elif self.value:
-            return ' '+str(self.value)
+            return chr(ord('０') + self.value)
         else:
             return '  '
 
@@ -36,22 +37,27 @@ class Cell:
         if self.detonated:
             return '🔥'
         if self.marked:
-            return '🚩'
+            if self.mine:
+                return '🚩'
+            else:
+                return '⍉!'
         elif self.mine:
             return '💣'
         else:
             return '  '
-            return '⬛'
 
     def dump(self):
         if self.detonated:
             return '🔥'
-        if self.marked:
-            return '🚩'
+        elif self.marked:
+            if self.mine:
+                return '🚩'
+            else:
+                return '⍉!'
         elif self.mine:
             return '💣'
         elif self.value:
-            return ' '+str(self.value)
+            return chr(ord('０') + self.value)
         else:
             return '  '
 
@@ -60,8 +66,6 @@ class Game:
         self.width = width
         self.height = height
         self.mines = mines
-        self.gameover = False
-        self.started = False
         self.createGame()
 
     def initGrid(self):
@@ -82,10 +86,18 @@ class Game:
             print(''.join(disp))
         print('--')
 
+    def xray(self):
+        for row in self.grid:
+            disp = [ cell.xray() for cell in row]
+            print(''.join(disp))
+        print('--')
+
     def end(self):
         self.gameover = True
 
     def createGame(self):
+        self.gameover = False
+        self.started = False
         self.grid = self.initGrid()
 
         mines = self.mines
@@ -100,16 +112,9 @@ class Game:
             return False
         self.grid[x][y].mine = True
         self.grid[x][y].value = 9  # Should never display except during debug
-        for x,y in self.immediateNeighbors(x, y):
+        for x,y in self.getNeighbors(x, y):
             self.grid[x][y].value += 1
         return True
-
-    def immediateNeighbors(self, x, y):
-        minx = max(0, x-1)
-        miny = max(0, y-1)
-        maxx = min(self.height, x+2)
-        maxy = min(self.width, y+2)
-        return set([(X,Y) for X in range(minx, maxx) for Y in range(miny, maxy) if (X-x or Y-y)])
 
     def findFreeNeighbors(self, x, y):
         new = set([(x,y)])
@@ -120,7 +125,7 @@ class Game:
             next = set()
             for x,y in new:
                 if self.grid[x][y].hidden and self.grid[x][y].value==0:
-                    next |= self.immediateNeighbors(x, y)
+                    next |= self.getNeighbors(x, y)
             next -= found
             new = next
         return found
@@ -131,20 +136,40 @@ class Game:
         for x,y in neighbors:
             self.grid[x][y].hidden = False
 
-        return len(neighbors)
+        return neighbors
+
+    def readCell(self, x, y):
+        ''' Return the displayed value on a cell, or None if cell is hidden '''
+        return self.grid[x][y].getValue()
+
+    def getNeighbors(self, x, y):
+        ''' Get the coordinates of all the cells adjacent to the given position. '''
+        minx = max(0, x-1)
+        miny = max(0, y-1)
+        maxx = min(self.height, x+2)
+        maxy = min(self.width, y+2)
+        return set([(X,Y) for X in range(minx, maxx) for Y in range(miny, maxy) if (X-x or Y-y)])
 
     def mark(self, x, y):
+        '''
+        Mark a cell as "has a bomb" (or remove a mark if already marked). For display purposes only.
+        returns True if the cell is now marked
+        '''
         if not self.grid[x][y].hidden:
             return False
         return self.grid[x][y].mark()
 
     def reveal(self, x, y):
+        '''
+        Reveal the cell at position x,y.
+        returns the set of new cells that were revealed
+        '''
         if not self.grid[x][y].hidden:
-            return
+            return set()
 
         exposed = self.floodReveal(x,y)
         if not self.started:
-            while exposed < 5 or self.grid[x][y].mine:
+            while len(exposed) < 5 or self.grid[x][y].mine:
                 # Give the player a fighting chance. Draw a new grid if he doesn't expose at least 5 cells.
                 self.createGame()
                 exposed = self.floodReveal(x,y)
@@ -155,6 +180,9 @@ class Game:
             print("BOOM!")
             self.end()
             # fixme: Display board and exit
+
+        # Returns the set
+        return exposed
 
 
 def test():
@@ -179,4 +207,4 @@ def test():
 
     game.dump()
 
-test()
+# test()
