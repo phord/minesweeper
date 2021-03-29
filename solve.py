@@ -43,7 +43,7 @@ class Solve:
         self.know = {}
 
         self.game = Game(self.width, self.height, mines)
-        self.reveal(self.width // 2, self.height // 2)
+        self.reveal(self.height // 2, self.width // 2)
 
         self.game.display()
 
